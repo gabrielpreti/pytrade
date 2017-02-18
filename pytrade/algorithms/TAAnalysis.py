@@ -26,7 +26,7 @@ class TAAnalysisTradingAlgorithm(TradingAlgorithm):
         resistencevalue = self._technicalIndicators[RESISTENCE_CODE][instrument][-1]
 
         #return bar.getVolume()>100000 and (bar.getClose()>resistencevalue and (shortsma[-1]/longsma[-1])>=1.15)
-        return (shortSmaValue / longSmaValue) >= 1.1 and (bar.getClose() >= resistencevalue or rsiValue<=20)
+        return (shortSmaValue / longSmaValue) >= 1.1 and (bar.getClose() >= resistencevalue or rsiValue<=20) and rsiValue<70
 
     def shouldSellStock(self, bar, instrument):
         rsiValue = self._technicalIndicators[RSI_CODE][instrument][-1]

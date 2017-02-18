@@ -6,8 +6,9 @@ from pytrade.base import TradingSystem
 from pyalgotrade.stratanalyzer import returns
 from pytrade.backtesting.analyzer.dalytradingresults import DailyTradingResults
 from pyalgotrade import plotter
-from matplotlib.backends.backend_pdf import PdfPages
 from pyalgotrade.plotter import SecondaryMarker
+import mpld3
+from mpld3 import plugins
 
 class GoogleFinanceBacktest(object):
 
@@ -61,8 +62,9 @@ class GoogleFinanceBacktest(object):
         self.__finalPortfolioValue = self.__strategy.getBroker().getEquity()
         self.__logger.info("Final portfolio value: $%.2f" % self.__strategy.getBroker().getEquity())
 
-    def generatePdfReport(self, pdfFile):
-        pdf = PdfPages(pdfFile)
+    def generateHtmlReport(self, htmlfilepath):
+        figures = []
+        htmlcontent = ""
         for p in self.__plotters:
             subplots = p.getSubplots()
             for instrument, subplot in subplots.items():
@@ -71,6 +73,27 @@ class GoogleFinanceBacktest(object):
                         p.getOrCreateSubplot(instrument + " " + ti.getName()).addAndProcessDataSeries(instrument + " " + ti.getName(), ti[instrument])
                     else:
                         subplot.addAndProcessDataSeries(instrument + " " + ti.getName(), ti[instrument], defaultClass=SecondaryMarker)
+            fig = p.buildFigure()
+            figures.append(fig)
+            htmlcontent += self.__generatehtml(fig)
 
-            pdf.savefig(p.buildFigure())
-        pdf.close()
+        with open(htmlfilepath, mode="w") as htmlfile:
+            htmlfile.write(htmlcontent)
+        return figures
+
+    def __generatehtml(self, fig):
+        i = 0
+        for ax in fig.get_axes():
+            plugins.connect(fig, plugins.InteractiveLegendPlugin(plot_elements=ax.get_lines(),
+                                                                 labels=[str(x) for x in
+                                                                         ax.get_legend().get_texts()], ax=ax,
+                                                                 alpha_unsel=0.0, alpha_over=1.5))
+            i += 1
+            for line in ax.get_lines():
+                line.set_ydata([x if x is not None else 0 for x in line.get_ydata()])
+                plugins.connect(fig, plugins.PointLabelTooltip(points=line,
+                                                               labels=[str(y) for y in line.get_ydata()],
+                                                               hoffset=10, voffset=10))
+
+        return mpld3.fig_to_html(fig)
+
