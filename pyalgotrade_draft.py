@@ -5,6 +5,7 @@ from datetime import timedelta
 from pytrade.algorithms.donchianchannels import DonchianTradingAlgorithm
 from pytrade.algorithms.sma import SMATradingAlgorithm
 import pytrade.algorithms.TAAnalysis as TAA
+import pytrade.algorithms.MLAnalysis as MLA
 from pytrade.backtesting.backtest import GoogleFinanceBacktest
 from pytrade.feed import DynamicFeed
 from pytrade.broker import PytradeBroker
@@ -17,7 +18,7 @@ from pytrade.feed import DynamicFeed
 from pyalgotrade.broker import Order
 import pytz, datetime
 from  pytrade.technicalindicator import TechnicalIndicator
-import pytrade.technicalindicator.RSI as RSI
+import pytrade.technicalindicator.AD as AD
 import pytrade.technicalindicator.SMA as SMA
 import pytrade.technicalindicator.SupportResistence as SupportResistence
 
@@ -31,17 +32,18 @@ backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015
 #algorithm = SMATradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), longsize=15, shortsize=11, riskFactor=0.02)
 #algorithm = SMATradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), longsize=50, shortsize=10, riskFactor=0.01)
 #algorithm = MixTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), rsiPeriod=10, shortTrendSize=5, longTrendSize=20, supportLineSize=26, resistenceLineSize=9, riskFactor=0.05)
-algorithm = TAA.TAAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05, technicalIndicators={
-    TAA.RSI_CODE:  TechnicalIndicator(backtest.getFeed(), TAA.RSI_CODE, RSI.RSICalculator(rsiPeriod=10), newPlot=True),
-    TAA.LONGSMA_CODE: TechnicalIndicator(backtest.getFeed(), TAA.LONGSMA_CODE, SMA.SMACalculator(size=20), newPlot=False),
-    TAA.SHORTSMA_CODE: TechnicalIndicator(backtest.getFeed(), TAA.SHORTSMA_CODE, SMA.SMACalculator(size=5), newPlot=False),
-    TAA.SUPPORT_CODE: TechnicalIndicator(backtest.getFeed(), TAA.SUPPORT_CODE, SupportResistence.SuportCalculator(windowSize=26), newPlot=False),
-    TAA.RESISTENCE_CODE: TechnicalIndicator(backtest.getFeed(), TAA.RESISTENCE_CODE, SupportResistence.ResistenceCalculator(windowSize=9), newPlot=False)
-})
+# algorithm = TAA.TAAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05, technicalIndicators={
+#     TAA.AD_CODE:  TechnicalIndicator(backtest.getFeed(), TAA.AD_CODE, AD.ADOSCCalculator(size=20), newPlot=True),
+#     TAA.LONGSMA_CODE: TechnicalIndicator(backtest.getFeed(), TAA.LONGSMA_CODE, SMA.SMACalculator(size=20), newPlot=False),
+#     TAA.SHORTSMA_CODE: TechnicalIndicator(backtest.getFeed(), TAA.SHORTSMA_CODE, SMA.SMACalculator(size=5), newPlot=False),
+#     TAA.SUPPORT_CODE: TechnicalIndicator(backtest.getFeed(), TAA.SUPPORT_CODE, SupportResistence.SuportCalculator(windowSize=26), newPlot=False),
+#     TAA.RESISTENCE_CODE: TechnicalIndicator(backtest.getFeed(), TAA.RESISTENCE_CODE, SupportResistence.ResistenceCalculator(windowSize=9), newPlot=False)
+# })
+algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05)
 backtest.attachAlgorithm(algorithm)
 backtest.run()
 
-figures = backtest.generateHtmlReport('/tmp/stock_analysis.html')
+backtest.generateHtmlReport('/tmp/stock_analysis.html')
 ############################################################################################################################
 
 # rowFilter = lambda row: row["Close"] == "-" or row["Open"] == "-" or row["High"] == "-" or row["Low"] == "-" or \

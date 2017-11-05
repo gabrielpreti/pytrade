@@ -14,7 +14,7 @@ class GoogleFinanceBacktest(object):
 
     LOGGER_NAME = "GoogleFinanceBacktest"
 
-    def __init__(self, instruments, initialCash, year, debugMode=True, csvStorage="./googlefinance"):
+    def __init__(self, instruments, initialCash, year, debugMode=True, csvStorage="./googlefinance", filterInvalidRows=True):
         self.__logger = logger.getLogger(GoogleFinanceBacktest.LOGGER_NAME)
         self.__finalPortfolioValue = 0
 
@@ -23,7 +23,7 @@ class GoogleFinanceBacktest(object):
         rowFilter = lambda row: row["Close"] == "-" or row["Open"] == "-" or row["High"] == "-" or row["Low"] == "-" or \
                                 row["Volume"] == "-"
 
-        self.__feed = googlefinance.build_feed(instruments, year, year, storage=csvStorage, skipErrors=True, rowFilter=rowFilter)
+        self.__feed = googlefinance.build_feed(instruments, year, year, storage=csvStorage, skipErrors=True, rowFilter=rowFilter if filterInvalidRows else None)
 
         # Create Broker
         comissionModel = backtesting.FixedPerTrade(10)

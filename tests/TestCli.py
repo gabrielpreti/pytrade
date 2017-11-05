@@ -6,7 +6,7 @@ from pytradeapi import PytradeApi
 from pytrade.algorithms.donchianchannels import DonchianTradingAlgorithm
 import pytz, datetime
 
-class CliIntegrationTests(unittest.TestCase):
+class TestCli(unittest.TestCase):
     db = "./sqliteddb"
     codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3",
              "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3",

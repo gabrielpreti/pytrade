@@ -30,6 +30,9 @@ class TechnicalIndicator(object):
     def __getitem__(self, key):
         return self.__values[key]
 
+    def keys(self):
+        return self.__values.keys()
+
 class TechnicalIndicatorCalculator(object):
     __metaclass__ = abc.ABCMeta
 

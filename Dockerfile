@@ -8,7 +8,8 @@ RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
   make && \
   make install
 
-RUN pip install pandas TA-Lib matplotlib texttable git+https://github.com/gabrielpreti/pyalgotrade.git
+RUN pip install pandas TA-Lib matplotlib texttable  git+https://github.com/gabrielpreti/pyalgotrade.git
+RUN pip install sklearn scipy
 
 COPY . /opt/pytrade/
 WORKDIR /opt/pytrade
