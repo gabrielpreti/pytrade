@@ -3,65 +3,82 @@ from pyalgotrade.broker import Order
 import numpy as np
 import talib
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.feature_selection import SelectFromModel
-from sklearn.feature_selection import VarianceThreshold
-import math
+
 
 class MLAnalysisTradingAlgorithm(TradingAlgorithm):
-
-    def __init__(self, feed, broker, riskFactor, models, pipeline, training_window_days=60, forecast_window_days=30):
+    def __init__(self, feed, broker, riskFactor, models, pipeline, training_buy_window_days=60,
+                 forecast_buy_window_days=30, training_sell_window_days=60, forecast_sell_window_days=30,
+                 buy_result_function=None, sell_result_function=None):
         super(MLAnalysisTradingAlgorithm, self).__init__(feed, broker)
         self.__riskFactor = riskFactor
         self.__models = models
-        self.__training_window_days = training_window_days
-        self.__forecast_window_days = forecast_window_days
+        self.__training_buy_window_days = training_buy_window_days
+        self.__forecast_buy_window_days = forecast_buy_window_days
+        self.__training_sell_window_days = training_sell_window_days
+        self.__forecast_sell_window_days = forecast_sell_window_days
         self.__pipeline = pipeline
         self.__purchases = {}
+        self.__buy_result_function = buy_result_function
+        self.__sell_result_function = sell_result_function
         broker.getOrderUpdatedEvent().subscribe(self.__onOrderEvent)
 
     def __onOrderEvent(self, broker_, orderEvent):
         order = orderEvent.getOrder()
-        if order.getAction() == Order.Action.BUY and (order.getState() == Order.State.FILLED or order.getState() == Order.State.PARTIALLY_FILLED):
+        if order.getAction() == Order.Action.BUY and (
+                        order.getState() == Order.State.FILLED or order.getState() == Order.State.PARTIALLY_FILLED):
             instrument = order.getInstrument()
             self.__purchases[instrument] = order.getAvgFillPrice()
 
     def shouldAnalyze(self, bar, instrument):
+        if self.getBroker().getShares(instrument) > 0:
+            return True
+
+        if self.getBroker().getEquity() < 100:
+            return False
+
         if self.__models is not None and instrument in self.__models.keys():
-            return len(self._feed[instrument].getCloseDataSeries())>30
+            return len(self._feed[instrument].getCloseDataSeries()) > 30
         else:
-            return len(self._feed[instrument].getCloseDataSeries()) > self.__training_window_days+self.__forecast_window_days
+            return len(self._feed[
+                           instrument].getCloseDataSeries()) > max(
+                (self.__training_buy_window_days + self.__forecast_buy_window_days),
+                (self.__training_sell_window_days + self.__forecast_sell_window_days))
 
     def shouldBuyStock(self, bar, instrument):
         if self.__models is not None and instrument in self.__models.keys():
             return self.__models[instrument].predict(self.generate_predict_dataset(instrument))[0] == 1
         else:
-            data_set = self.generate_trainingtobuy_dataset(instrument, training_window_days=self.__training_window_days, forecast_window_days=self.__forecast_window_days)
+            data_set = self.generate_trainingtobuy_dataset(instrument,
+                                                           training_window_days=self.__training_buy_window_days,
+                                                           forecast_window_days=self.__forecast_buy_window_days)
             X = data_set.drop(labels=['result'], axis=1)
             y = [1 if y else 0 for y in data_set.result]
-            model = self.__pipeline.fit(X, y)
+            if len(set(y)) == 1 or len(X) == 0:
+                return False
 
+            model = self.__pipeline.fit(X, y)
             return model.predict(self.generate_predict_dataset(instrument))[0] == 1
 
     def shouldSellStock(self, bar, instrument):
-        if bar.getClose()<self.__purchases[instrument]:
+        if bar.getClose() < self.__purchases[instrument]:
             return False
 
         if self.__models is not None and instrument in self.__models.keys():
             return self.__models[instrument].predict(self.generate_predict_dataset(instrument))[0] == 0
         else:
-            data_set = self.generate_trainingtosell_dataset(instrument, training_window_days=self.__training_window_days,
-                                                      forecast_window_days=self.__forecast_window_days)
+            data_set = self.generate_trainingtosell_dataset(instrument,
+                                                            training_window_days=self.__training_sell_window_days,
+                                                            forecast_window_days=self.__forecast_sell_window_days)
             X = data_set.drop(labels=['result'], axis=1)
             y = [1 if y else 0 for y in data_set.result]
+
+            if len(X) == 0:
+                return False
+            if len(set(y)) == 1:
+                return y[0] == 1
+
             model = self.__pipeline.fit(X, y)
-
             return model.predict(self.generate_predict_dataset(instrument))[0] == 1
-
 
     def calculateEntrySize(self, bar, instrument):
 
@@ -69,13 +86,12 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         closeValue = bar.getClose()
         stopLossPoint = self.calculateStopLoss(bar, instrument)
         # return max(1, math.floor ( (totalCash * self.__riskFactor) / ((closeValue - stopLossPoint) if closeValue!=stopLossPoint else 1) ))
-        return min(1000, totalCash)/closeValue
+        return min(1000, totalCash) / closeValue
 
     def calculateStopLoss(self, bar, instrument):
-        low_values = np.array(self._feed[instrument].getLowDataSeries())
-        return min(low_values[-(26 + 2):-2]) if len(low_values) > (26 + 1) else None
-        # return 0
-
+        # low_values = np.array(self._feed[instrument].getLowDataSeries())
+        # return min(low_values[-(26 + 2):-2]) if len(low_values) > (26 + 1) else None
+        return 0
 
     def generate_training_dataset(self, instrument, training_window_days, forecast_window_days):
         open_series = self._feed[instrument].getOpenDataSeries()
@@ -84,35 +100,36 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         low_series = self._feed[instrument].getLowDataSeries()
         volume_series = self._feed[instrument].getVolumeDataSeries()
 
-        open_values = np.array(open_series) if training_window_days is None else np.array(open_series)[-(training_window_days+forecast_window_days):]
-        close_values = np.array(close_series) if training_window_days is None else np.array(close_series)[-(training_window_days+forecast_window_days):]
-        high_values = np.array(high_series) if training_window_days is None else np.array(high_series)[-(training_window_days+forecast_window_days):]
-        low_values = np.array(low_series) if training_window_days is None else np.array(low_series)[-(training_window_days+forecast_window_days):]
-        volume_values = np.array(volume_series) if training_window_days is None else np.array(volume_series)[-(training_window_days+forecast_window_days):]
+        open_values = np.array(open_series) if training_window_days is None else np.array(open_series)[-(
+            training_window_days + forecast_window_days):]
+        close_values = np.array(close_series) if training_window_days is None else np.array(close_series)[-(
+            training_window_days + forecast_window_days):]
+        high_values = np.array(high_series) if training_window_days is None else np.array(high_series)[-(
+            training_window_days + forecast_window_days):]
+        low_values = np.array(low_series) if training_window_days is None else np.array(low_series)[-(
+            training_window_days + forecast_window_days):]
+        volume_values = np.array(volume_series) if training_window_days is None else np.array(volume_series)[-(
+            training_window_days + forecast_window_days):]
 
         data_set = self.__generate_features(close_values, high_values, low_values, open_values, volume_values)
         return data_set.fillna(value=0)
 
     def generate_trainingtobuy_dataset(self, instrument, training_window_days, forecast_window_days):
-        data_set = self.generate_training_dataset(instrument=instrument, training_window_days=training_window_days, forecast_window_days=forecast_window_days)
-        data_set['result'] = [all(map(lambda x: x>v, data_set.close_price[i+1:i+forecast_window_days])) if i < len(data_set.close_price) - forecast_window_days else None for (i, v) in
-                              list(enumerate(data_set.close_price))]
-        # data_set['result'] = [
-        #     data_set.open_price[i + forecast_window_days] > 1.1 * v if i < len(data_set.close_price) - forecast_window_days else None
-        #     for (i, v)
-        #     in list(enumerate(data_set.close_price))]
+        data_set = self.generate_training_dataset(instrument=instrument, training_window_days=training_window_days,
+                                                  forecast_window_days=forecast_window_days)
+        data_set['result'] = self.__buy_result_function(open=data_set.open_price, close=data_set.close_price,
+                                                        high=data_set.high_price, low=data_set.low_price,
+                                                        volume=data_set.volume_price,
+                                                        forecast_window_days=forecast_window_days)
         return data_set[data_set.result.astype(str).ne('None')]
 
     def generate_trainingtosell_dataset(self, instrument, training_window_days, forecast_window_days):
-        data_set = self.generate_training_dataset(instrument=instrument, training_window_days=training_window_days, forecast_window_days=forecast_window_days)
-        data_set['result'] = [
-            all(map(lambda x: x < v, data_set.close_price[i + 1:i + forecast_window_days])) if i < len(
-                data_set.close_price) - forecast_window_days else None for (i, v) in
-            list(enumerate(data_set.close_price))]
-        # data_set['result'] = [
-        #     data_set.open_price[i + forecast_window_days] < 0.90 * v if i < len(data_set.close_price) - forecast_window_days else None
-        #     for (i, v)
-        #     in list(enumerate(data_set.close_price))]
+        data_set = self.generate_training_dataset(instrument=instrument, training_window_days=training_window_days,
+                                                  forecast_window_days=forecast_window_days)
+        data_set['result'] = self.__sell_result_function(open=data_set.open_price, close=data_set.close_price,
+                                                         high=data_set.high_price, low=data_set.low_price,
+                                                         volume=data_set.volume_price,
+                                                         forecast_window_days=forecast_window_days)
         return data_set[data_set.result.astype(str).ne('None')]
 
     def generate_predict_dataset(self, instrument):
@@ -312,7 +329,7 @@ class CorrelationAnalysisTradingAlgorithm(TradingAlgorithm):
         self.sellscores = []
 
     def shouldAnalyze(self, bar, instrument):
-        return len(self._feed[instrument].getCloseDataSeries())>30
+        return len(self._feed[instrument].getCloseDataSeries()) > 30
 
     def shouldBuyStock(self, bar, instrument):
         movements_frame = self.generate_data_set(instrument)
@@ -329,7 +346,7 @@ class CorrelationAnalysisTradingAlgorithm(TradingAlgorithm):
     def calculateEntrySize(self, bar, instrument):
         totalCash = self.getBroker().getEquity()
         closeValue = bar.getClose()
-        return min(1000, totalCash)/closeValue
+        return min(1000, totalCash) / closeValue
 
     def calculateStopLoss(self, bar, instrument):
         low_values = np.array(self._feed[instrument].getLowDataSeries())
@@ -344,4 +361,3 @@ class CorrelationAnalysisTradingAlgorithm(TradingAlgorithm):
             movements_frame[code] = [(closevalues[-1] - closevalues[-2]) / closevalues[-2]]
 
         return movements_frame
-

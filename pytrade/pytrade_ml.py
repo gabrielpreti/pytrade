@@ -1,407 +1,251 @@
-import matplotlib
-#matplotlib.use('PDF')
-from sklearn.tree.tree import ExtraTreeClassifier
-
 from pytrade.backtesting.backtest import GoogleFinanceBacktest
-import numpy as np
-from talib import SMA
+import pytrade.algorithms.MLAnalysis as MLA
 import pandas as pd
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from pandas.tools.plotting import scatter_matrix
-from matplotlib.colors import ListedColormap
-from talib import STOCHF
-from talib import RSI
-from talib import AD
-from talib import DEMA
-import talib
-
-from sklearn.cross_validation import train_test_split
+import os
+from functools import partial
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Perceptron
-from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
-from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.feature_selection import SelectFromModel
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import f_regression
-from sklearn.feature_selection import f_classif
-from sklearn.metrics import confusion_matrix
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.linear_model import LogisticRegression
-import seaborn as sn
-from sklearn.naive_bayes import GaussianNB
-from sklearn.naive_bayes import MultinomialNB
-from sklearn import metrics
-from sklearn.decomposition import PCA
 
-codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3", "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3", "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3", "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11", "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
-
-def generate_data_set(open_values, close_values, high_values, low_values, volume_values, period):
-    data_set = pd.DataFrame()
-    data_set['open_price'] = open_values
-    data_set['close_price'] = close_values
-    data_set['high_price'] = high_values
-    data_set['low_price'] = low_values
-    data_set['volume_price'] = volume_values
-    data_set['short_sma'] = SMA(close_values, 5)
-    data_set['long_sma'] = SMA(close_values, 20)
-    data_set['sma_diff'] = data_set.long_sma - data_set.short_sma
-    data_set['stochf0'] = STOCHF(high=high_values, low=low_values, close=close_values)[0]
-    data_set['stochf1'] = STOCHF(high=high_values, low=low_values, close=close_values)[1]
-    data_set['rsi'] = RSI(close_values, 20)
-    data_set['ad'] = AD(high=high_values, low=low_values, close=close_values, volume=volume_values)
-    data_set['dema'] = DEMA(close_values)
-    data_set['ema'] = talib.EMA(close_values)
-    data_set['ht_trendiline'] = talib.HT_TRENDLINE(close_values)
-    data_set['kama'] = talib.KAMA(close_values)
-    data_set['midpoint'] = talib.MIDPOINT(close_values)
-    data_set['midprice'] = talib.MIDPRICE(high=high_values, low=low_values)
-    data_set['sar'] = talib.SAR(high=high_values, low=low_values)
-    data_set['sarext'] = talib.SAREXT(high=high_values, low=low_values)
-    data_set['adx'] = talib.ADX(high=high_values, low=low_values, close=close_values)
-    data_set['adxr'] = talib.ADXR(high=high_values, low=low_values, close=close_values)
-    data_set['apo'] = talib.APO(close_values)
-    data_set['aroon0'] = talib.AROON(high=high_values, low=low_values)[0]
-    data_set['aroon1'] = talib.AROON(high=high_values, low=low_values)[1]
-    data_set['aroonosc'] = talib.AROONOSC(high=high_values, low=low_values)
-    data_set['bop'] = talib.BOP(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['cmo'] = talib.CMO(close_values)
-    data_set['dx'] = talib.DX(high=high_values, low=low_values, close=close_values)
-    data_set['macdfix0'] = talib.MACDFIX(close_values)[0]
-    data_set['macdfix1'] = talib.MACDFIX(close_values)[1]
-    data_set['macdfix2'] = talib.MACDFIX(close_values)[2]
-    data_set['mfi'] = talib.MFI(high=high_values, low=low_values, close=close_values, volume=volume_values)
-    data_set['minus_di'] = talib.MINUS_DI(high=high_values, low=low_values, close=close_values)
-    data_set['minus_dm'] = talib.MINUS_DM(high=high_values, low=low_values)
-    data_set['mom'] = talib.MOM(close_values)
-    data_set['plus_di'] = talib.PLUS_DI(high=high_values, low=low_values, close=close_values)
-    data_set['plus_dm'] = talib.PLUS_DM(high=high_values, low=low_values)
-    data_set['ppo'] = talib.PPO(close_values)
-    data_set['roc'] = talib.ROC(close_values)
-    data_set['stochf0'] = talib.STOCHF(high=high_values, low=low_values, close=close_values)[0]
-    data_set['stochf1'] = talib.STOCHF(high=high_values, low=low_values, close=close_values)[1]
-    data_set['stochrsi0'] = talib.STOCHRSI(close_values)[0]
-    data_set['stochrsi1'] = talib.STOCHRSI(close_values)[1]
-    # data_set['trix'] = talib.TRIX(close_values)
-    data_set['ultosc'] = talib.ULTOSC(high=high_values, low=low_values, close=close_values)
-    data_set['willr'] = talib.WILLR(high=high_values, low=low_values, close=close_values)
-    data_set['adosc'] = talib.ADOSC(high=high_values, low=low_values, close=close_values, volume=volume_values)
-    data_set['obv'] = talib.OBV(close_values, volume_values)
-    data_set['ht_dcperiod'] = talib.HT_DCPERIOD(close_values)
-    data_set['ht_dcphase'] = talib.HT_DCPHASE(close_values)
-    data_set['ht_phasor0'] = talib.HT_PHASOR(close_values)[0]
-    data_set['ht_phasor1'] = talib.HT_PHASOR(close_values)[1]
-    data_set['ht_sine0'] = talib.HT_SINE(close_values)[0]
-    data_set['ht_sine1'] = talib.HT_SINE(close_values)[1]
-    data_set['ht_trendmode'] = talib.HT_TRENDMODE(close_values)
-    data_set['atr'] = talib.ATR(high=high_values, low=low_values, close=close_values)
-    data_set['trange'] = talib.TRANGE(high=high_values, low=low_values, close=close_values)
-
-    data_set['CDL2CROWS'] = talib.CDL2CROWS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3BLACKCROWS'] = talib.CDL3BLACKCROWS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3INSIDE'] = talib.CDL3INSIDE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3LINESTRIKE'] = talib.CDL3LINESTRIKE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3OUTSIDE'] = talib.CDL3OUTSIDE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3STARSINSOUTH'] = talib.CDL3STARSINSOUTH(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDL3WHITESOLDIERS'] = talib.CDL3WHITESOLDIERS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLABANDONEDBABY'] = talib.CDLABANDONEDBABY(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLADVANCEBLOCK'] = talib.CDLADVANCEBLOCK(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLBELTHOLD'] = talib.CDLBELTHOLD(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLBREAKAWAY'] = talib.CDLBREAKAWAY(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLCLOSINGMARUBOZU'] = talib.CDLCLOSINGMARUBOZU(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLCONCEALBABYSWALL'] = talib.CDLCONCEALBABYSWALL(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLCOUNTERATTACK'] = talib.CDLCOUNTERATTACK(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLDARKCLOUDCOVER'] = talib.CDLDARKCLOUDCOVER(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLDOJI'] = talib.CDLDOJI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLDOJISTAR'] = talib.CDLDOJISTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLDRAGONFLYDOJI'] = talib.CDLDRAGONFLYDOJI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLENGULFING'] = talib.CDLENGULFING(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLEVENINGDOJISTAR'] = talib.CDLEVENINGDOJISTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLEVENINGSTAR'] = talib.CDLEVENINGSTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLGAPSIDESIDEWHITE'] = talib.CDLGAPSIDESIDEWHITE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLGRAVESTONEDOJI'] = talib.CDLGRAVESTONEDOJI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHAMMER'] = talib.CDLHAMMER(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHANGINGMAN'] = talib.CDLHANGINGMAN(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHARAMI'] = talib.CDLHARAMI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHARAMICROSS'] = talib.CDLHARAMICROSS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHIGHWAVE'] = talib.CDLHIGHWAVE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHIKKAKE'] = talib.CDLHIKKAKE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHIKKAKEMOD'] = talib.CDLHIKKAKEMOD(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLHOMINGPIGEON'] = talib.CDLHOMINGPIGEON(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLIDENTICAL3CROWS'] = talib.CDLIDENTICAL3CROWS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLINNECK'] = talib.CDLINNECK(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLINVERTEDHAMMER'] = talib.CDLINVERTEDHAMMER(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLKICKING'] = talib.CDLKICKING(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLKICKINGBYLENGTH'] = talib.CDLKICKINGBYLENGTH(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLLADDERBOTTOM'] = talib.CDLLADDERBOTTOM(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLLONGLEGGEDDOJI'] = talib.CDLLONGLEGGEDDOJI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLLONGLINE'] = talib.CDLLONGLINE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLMARUBOZU'] = talib.CDLMARUBOZU(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLMATCHINGLOW'] = talib.CDLMATCHINGLOW(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLMATHOLD'] = talib.CDLMATHOLD(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLMORNINGDOJISTAR'] = talib.CDLMORNINGDOJISTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLMORNINGSTAR'] = talib.CDLMORNINGSTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLONNECK'] = talib.CDLONNECK(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLPIERCING'] = talib.CDLPIERCING(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLRICKSHAWMAN'] = talib.CDLRICKSHAWMAN(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLRISEFALL3METHODS'] = talib.CDLRISEFALL3METHODS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSEPARATINGLINES'] = talib.CDLSEPARATINGLINES(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSHOOTINGSTAR'] = talib.CDLSHOOTINGSTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSHORTLINE'] = talib.CDLSHORTLINE(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSPINNINGTOP'] = talib.CDLSPINNINGTOP(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSTALLEDPATTERN'] = talib.CDLSTALLEDPATTERN(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLSTICKSANDWICH'] = talib.CDLSTICKSANDWICH(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLTAKURI'] = talib.CDLTAKURI(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLTASUKIGAP'] = talib.CDLTASUKIGAP(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLTHRUSTING'] = talib.CDLTHRUSTING(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLTRISTAR'] = talib.CDLTRISTAR(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLUNIQUE3RIVER'] = talib.CDLUNIQUE3RIVER(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLUPSIDEGAP2CROWS'] = talib.CDLUPSIDEGAP2CROWS(open=open_values, high=high_values, low=low_values, close=close_values)
-    data_set['CDLXSIDEGAP3METHODS'] = talib.CDLXSIDEGAP3METHODS(open=open_values, high=high_values, low=low_values, close=close_values)
-
-    data_set['result'] = [all(map(lambda x: x>v, close_values[i+1:i+period])) if i < len(close_values) - period else None for (i, v) in
-                          list(enumerate(close_values))]
-    # data_set['result'] = [open_values[i+period] > 1.01*v if i < len(close_values) - period else None for (i, v) in
-    #                       list(enumerate(close_values))]
-    return data_set.fillna(value=0)
-
-pipe_clf = Pipeline([
-    ('scaler', StandardScaler()),
-    # ('feature_selection', VarianceThreshold()),
-    ('feature_selection', SelectKBest(mutual_info_classif, k=5)),
-    # ('feature_selection', PCA(n_components=10)),
+import multiprocessing
+from pathos.multiprocessing import ProcessingPool as Pool
+from joblib import Parallel, delayed
 
 
-    # ('clf', MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1))
-    # ('classifier', SVC(kernel='rbf', C=1.0, random_state=0, probability=True))
-    # ('classifier', DecisionTreeClassifier())
-    # ('regressor', DecisionTreeRegressor())
-
-    # ('clf', RandomForestClassifier(n_estimators=20))
-    ('clf', LogisticRegression())
-])
-
-feed_2014 = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2014, debugMode=False,
-                                     csvStorage="./googlefinance").getFeed()
-feed_2014.loadAll()
-feed_2015 = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015, debugMode=False,
-                                     csvStorage="./googlefinance").getFeed()
-feed_2015.loadAll()
-feed_2016 = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2016, debugMode=False,
-                                     csvStorage="./googlefinance").getFeed()
-feed_2016.loadAll()
-sum_auc = 0
-plt.rc('font', size=5)          # controls default text sizes
-plt.rc('axes', titlesize=5)     # fontsize of the axes title
-plt.rc('axes', labelsize=5)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=5)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=5)    # fontsize of the tick labels
-plt.figure(1)
-i=1
-for code in codes:
-    print("Analising %s" % (code))
-    open_values_2014 = np.array(feed_2014.getDataSeries(instrument=code).getOpenDataSeries())
-    close_values_2014 = np.array(feed_2014.getDataSeries(instrument=code).getCloseDataSeries())
-    high_values_2014 = np.array(feed_2014.getDataSeries(instrument=code).getHighDataSeries())
-    low_values_2014 = np.array(feed_2014.getDataSeries(instrument=code).getLowDataSeries())
-    volume_values_2014 = np.array(feed_2014.getDataSeries(instrument=code).getVolumeDataSeries())
-    data_set_2014 = generate_data_set(open_values_2014, close_values_2014, high_values_2014, low_values_2014, volume_values_2014, 10)
-
-    X = data_set_2014.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set_2014.result]
-    pipe_clf.fit(X, y)
-
-    open_values_2015 = np.array(feed_2015.getDataSeries(instrument=code).getOpenDataSeries())
-    close_values_2015 = np.array(feed_2015.getDataSeries(instrument=code).getCloseDataSeries())
-    high_values_2015 = np.array(feed_2015.getDataSeries(instrument=code).getHighDataSeries())
-    low_values_2015 = np.array(feed_2015.getDataSeries(instrument=code).getLowDataSeries())
-    volume_values_2015 = np.array(feed_2015.getDataSeries(instrument=code).getVolumeDataSeries())
-    data_set_2015 = generate_data_set(open_values_2015, close_values_2015, high_values_2015, low_values_2015, volume_values_2015, 10)
-
-    X = data_set_2015.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set_2015.result]
-    precision, recall, thresholds = metrics.precision_recall_curve(y[:], pipe_clf.predict_proba(X)[:, 1])
-    auc = metrics.auc(recall, precision)
-    if auc <=0.5:
-        print("Skiping %s" % (code))
-        continue
-
-    X = data_set_2015.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set_2015.result]
-    pipe_clf.fit(X, y)
-
-    open_values_2016 = np.array(feed_2016.getDataSeries(instrument=code).getOpenDataSeries())
-    close_values_2016 = np.array(feed_2016.getDataSeries(instrument=code).getCloseDataSeries())
-    high_values_2016 = np.array(feed_2016.getDataSeries(instrument=code).getHighDataSeries())
-    low_values_2016 = np.array(feed_2016.getDataSeries(instrument=code).getLowDataSeries())
-    volume_values_2016 = np.array(feed_2016.getDataSeries(instrument=code).getVolumeDataSeries())
-    data_set_2016 = generate_data_set(open_values_2016, close_values_2016, high_values_2016, low_values_2016, volume_values_2016, 10)
-
-    X = data_set_2016.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set_2016.result]
-
-    precision, recall, thresholds = metrics.precision_recall_curve(y[:], pipe_clf.predict_proba(X)[:,1])
-    auc = metrics.auc(recall, precision)
-    sum_auc += auc
-    plt.subplot(6, 10, i)
-    plt.plot(recall, precision)
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('%s,AUC=%.2f' % (code, auc), fontdict={'fontsize':5})
-    i += 1
-plt.figure(1).suptitle("Sum AUC=%.2f" % (sum_auc))
-
-#########################################################################################################################################
-plt.scatter(data_set[data_set.result].short_sma, data_set[data_set.result].long_sma, color='green', label="positive")
-plt.scatter(data_set[data_set.result==False].short_sma, data_set[data_set.result==False].long_sma, color='red', label="negative")
-plt.xlabel("short_sma")
-plt.ylabel("long_sma")
-plt.legend(loc='best')
-
-scatter_matrix(data_set)
-
-def plot_decision_regions(X, y, classifier, resolution=0.02):
-    # setup marker generator and color map
-    markers = ('s', 'x', 'o', '^', 'v')
-    colors = ('red', 'blue', 'lightgreen', 'gray', 'cyan')
-    cmap = ListedColormap(colors[:len(np.unique(y))])
-
-    # plot the decision surface
-    x1_min, x1_max = X[:, 0].min() - 1, X[:, 0].max() + 1
-    x2_min, x2_max = X[:, 1].min() - 1, X[:, 1].max() + 1
-    xx1, xx2 = np.meshgrid(np.arange(x1_min, x1_max, resolution),
-                           np.arange(x2_min, x2_max, resolution))
-    Z = classifier.predict(np.array([xx1.ravel(), xx2.ravel()]).T)
-    Z = Z.reshape(xx1.shape)
-    plt.contourf(xx1, xx2, Z, alpha=0.4, cmap=cmap)
-    plt.xlim(xx1.min(), xx1.max())
-    plt.ylim(xx2.min(), xx2.max())
-
-    # plot class samples
-    for idx, cl in enumerate(np.unique(y)):
-        plt.scatter(x=X[y == cl, 0], y=X[y == cl, 1],
-                    alpha=0.8, c=cmap(idx),
-                    marker=markers[idx], label=cl)
+#############################################################################
 
 
-#########################################################################################################################################
-import pytrade.algorithms.MLAnalysis as MLA
-
-codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3", "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3", "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3", "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11", "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
-pipelines = {}
-feed_2014 = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2014, debugMode=False,
-                                     csvStorage="./googlefinance").getFeed()
-feed_2014.loadAll()
-feed_2015 = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015, debugMode=False,
-                                     csvStorage="./googlefinance").getFeed()
-feed_2015.loadAll()
-for code in codes:
-    open_values = np.append(np.array(feed_2014.getDataSeries(instrument=code).getOpenDataSeries()),
-                            np.array(feed_2015.getDataSeries(instrument=code).getOpenDataSeries()))
-    close_values = np.append(np.array(feed_2014.getDataSeries(instrument=code).getCloseDataSeries()),
-                             np.array(feed_2015.getDataSeries(instrument=code).getCloseDataSeries()))
-    high_values = np.append(np.array(feed_2014.getDataSeries(instrument=code).getHighDataSeries()),
-                            np.array(feed_2015.getDataSeries(instrument=code).getHighDataSeries()))
-    low_values = np.append(np.array(feed_2014.getDataSeries(instrument=code).getLowDataSeries()),
-                           np.array(feed_2015.getDataSeries(instrument=code).getLowDataSeries()))
-    volume_values = np.append(np.array(feed_2014.getDataSeries(instrument=code).getVolumeDataSeries()),
-                              np.array(feed_2015.getDataSeries(instrument=code).getVolumeDataSeries()))
-    data_set = generate_data_set(open_values, close_values, high_values, low_values, volume_values, 30)
-
-    X = data_set.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set.result]
-
-    pipe_clf = Pipeline([
-        ('scaler', StandardScaler()),
-        ('feature_selection2', SelectKBest(mutual_info_classif, k=30)),
-        ('classifier', DecisionTreeClassifier())
-    ])
-
-    pipe_clf.fit(X, y)
-    pipelines[code] = pipe_clf
-
-backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2016, debugMode=False, csvStorage="./googlefinance")
-algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05, models=pipelines)
-backtest.attachAlgorithm(algorithm)
-backtest.run()
-
-backtest.generateHtmlReport('/tmp/stock_analysis.html')
+def buy_result_function(open, close, high, low, volume, forecast_window_days):
+    # return [all(map(lambda x: x>=0.9*v, close[i+1:i+forecast_window_days])) if i < len(close) - forecast_window_days else None for (i, v) in
+    #                       list(enumerate(close))]
+    return [
+        close[i + forecast_window_days] > 1.1 * v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))]
 
 
-#########################################################################################################################################
-code = codes[0]
-backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015, debugMode=False,
-                                     csvStorage="./googlefinance")
-backtest.getFeed().loadAll()
-open_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getOpenDataSeries())
-close_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getCloseDataSeries())
-high_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getHighDataSeries())
-low_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getLowDataSeries())
-volume_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getVolumeDataSeries())
-data_set = generate_data_set(open_values, close_values, high_values, low_values, volume_values, 15)
-X = data_set.drop(labels=['result'], axis=1)
-y = [1 if y else 0 for y in data_set.result]
-rf = RandomForestClassifier(criterion='entropy')
-rf.fit_transform(X, y)
-sorted_features = sorted(zip(mutual_info_classif(X, y), X.columns), reverse=True)
-plt.figure()
-plt.title("Feature importances")
-plt.bar(range(0, len(sorted_features)), [x[0] for x in sorted_features])
-plt.xticks(range(0, len(sorted_features)), [x[1] for x in sorted_features], rotation='vertical')
+def sell_result_function(open, close, high, low, volume, forecast_window_days):
+    # return [
+    #     all(map(lambda x: x < v, data_set.close_price[i + 1:i + forecast_window_days])) if i < len(
+    #         data_set.close_price) - forecast_window_days else None for (i, v) in
+    #     list(enumerate(data_set.close_price))]
+    return [
+        close[i + forecast_window_days] < v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))]
 
 
-#########################################################################################################################################
-for code in codes:
-    backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015, debugMode=False,
-                                         csvStorage="./googlefinance")
-    backtest.getFeed().loadAll()
-    open_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getOpenDataSeries())
-    close_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getCloseDataSeries())
-    high_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getHighDataSeries())
-    low_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getLowDataSeries())
-    volume_values = np.array(backtest.getFeed().getDataSeries(instrument=code).getVolumeDataSeries())
-    data_set = generate_data_set(open_values, close_values, high_values, low_values, volume_values, 15)
-    X = data_set.drop(labels=['result'], axis=1)
-    y = [1 if y else 0 for y in data_set.result]
-
-    from sklearn.decomposition import PCA
-    from sklearn.preprocessing import scale
-    X = scale(X)
-
-    n_pca_comp=3
-    pca = PCA(n_components=n_pca_comp)
-    Xtrans = pca.fit_transform(X, y)
-    Xtrans = np.insert(Xtrans, n_pca_comp, y, axis=1)
-    true_values = np.where(Xtrans[:, n_pca_comp]==1)
-    false_values = np.where(Xtrans[:, n_pca_comp]==0)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_title(code)
-    ax.scatter(Xtrans[true_values, 0], Xtrans[true_values, 1], Xtrans[true_values, 2], c='blue')
-    ax.scatter(Xtrans[false_values, 0], Xtrans[false_values, 1], Xtrans[false_values, 2], c='red')
-
-#########################################################################################################################################
-import pytrade.algorithms.MLAnalysis as MLA
-
+codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3",
+         "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3",
+         "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3",
+         "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11",
+         "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
 pipeline = Pipeline([
-        ('scaler', StandardScaler()),
-        ('feature_selection2', SelectKBest(mutual_info_classif, k=10)),
-        ('classifier', DecisionTreeClassifier())
-    ])
-backtest = GoogleFinanceBacktest(instruments=codes[:10], initialCash=10000, year=2016, debugMode=False, csvStorage="./googlefinance")
-algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05, models=None, pipeline=pipeline, training_window_days=100, forecast_window_days=30)
+    ('scaler', StandardScaler()),
+    ('feature_selection2', SelectKBest(mutual_info_classif, k=100)),
+    # ('classifier', DecisionTreeClassifier())
+    # ('classifier', RandomForestClassifier(n_estimators=50, n_jobs=-1))
+    ('classifier', SVC(kernel='rbf', C=1.0, random_state=0))
+])
+backtest = GoogleFinanceBacktest(instruments=codes[:10], initialCash=10000, fromYear=2014, toYear=2016, debugMode=False,
+                                 csvStorage="./googlefinance")
+algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05,
+                                           models=None, pipeline=pipeline, training_buy_window_days=400,
+                                           forecast_buy_window_days=20, training_sell_window_days=400,
+                                           forecast_sell_window_days=20, buy_result_function=buy_result_function,
+                                           sell_result_function=sell_result_function)
 backtest.attachAlgorithm(algorithm)
 backtest.run()
 
 backtest.generateHtmlReport('/tmp/stock_analysis.html')
 plt.close('all')
+
+####################################################
+####################################################
+buy_functions = {
+    'BF1': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] > v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'BF2': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] > 1.1 * v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'BF3': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] > 1.2 * v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'BF4': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x >= v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'BF5': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x >= 0.95 * v, close[i + 1:i + forecast_window_days])) and close[
+                                                                                         i + forecast_window_days] > v if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'BF6': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x >= 0.9 * v, close[i + 1:i + forecast_window_days])) and close[
+                                                                                        i + forecast_window_days] > v if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))]
+}
+
+sell_functions = {
+    'SF1': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] < v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'SF2': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] < 1.1 * v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'SF3': lambda open, close, high, low, volume, forecast_window_days: [
+        close[i + forecast_window_days] < 0.9 * v if i < len(close) - forecast_window_days else None
+        for (i, v)
+        in list(enumerate(close))],
+    'SF4': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x < v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'SF5': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x < 0.95 * v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'SF6': lambda open, close, high, low, volume, forecast_window_days: [
+        all(map(lambda x: x < 0.9 * v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'SF7': lambda open, close, high, low, volume, forecast_window_days: [
+        any(map(lambda x: x < 0.9 * v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))],
+    'SF8': lambda open, close, high, low, volume, forecast_window_days: [
+        any(map(lambda x: x < 0.8 * v, close[i + 1:i + forecast_window_days])) if i < len(
+            close) - forecast_window_days else None for (i, v) in
+        list(enumerate(close))]
+}
+
+codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3",
+         "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3",
+         "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3",
+         "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11",
+         "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('feature_selection2', SelectKBest(mutual_info_classif, k=100)),
+    # ('classifier', DecisionTreeClassifier())
+    # ('classifier', RandomForestClassifier(n_estimators=50, n_jobs=-1))
+    ('classifier', SVC(kernel='rbf', C=1.0, random_state=0))
+])
+
+
+def run_algorithm(forecast_sell_window_days, buy_result_function, sell_result_function, fromYear=2015, toYear=2016, training_buy_window_days=400,
+                  forecast_buy_window_days=20, training_sell_window_days=400, intermediary_results_file=None):
+    print(
+        "fromYear=%s toYear=%s, training_buy_window_days=%s, forecast_buy_window_days=%s, training_sell_window_days=%s, forecast_sell_window_days=%s" % (
+            fromYear, toYear, training_buy_window_days, forecast_buy_window_days, training_sell_window_days,
+            forecast_sell_window_days))
+
+    if intermediary_results_file is not None and os.path.exists(intermediary_results_file):
+        intermediary_results = pd.read_csv(intermediary_results_file, index_col=0)
+        intermediary_results = intermediary_results[
+            (intermediary_results.training_buy_window_days == training_buy_window_days) &
+            (intermediary_results.forecast_buy_window_days == forecast_buy_window_days) &
+            (intermediary_results.training_sell_window_days == training_sell_window_days) &
+            (intermediary_results.forecast_sell_window_days == forecast_sell_window_days)
+            ]
+        if len(intermediary_results) > 0:
+            result = intermediary_results.final_equity.values[0]
+            print(
+                "Found intermediary result for training_buy_window_days=%s, forecast_buy_window_days=%s, training_sell_window_days=%s, forecast_sell_window_days=%s with value %s. I'll not calculate it again" % (
+                    training_buy_window_days, forecast_buy_window_days, training_sell_window_days,
+                    forecast_sell_window_days, result))
+            return result
+
+    backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, fromYear=fromYear, toYear=toYear,
+                                     debugMode=False,
+                                     csvStorage="./googlefinance")
+
+    algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05,
+                                               models=None, pipeline=pipeline,
+                                               training_buy_window_days=training_buy_window_days,
+                                               forecast_buy_window_days=forecast_buy_window_days,
+                                               training_sell_window_days=training_sell_window_days,
+                                               forecast_sell_window_days=forecast_sell_window_days,
+                                               buy_result_function=buy_result_function,
+                                               sell_result_function=sell_result_function)
+    backtest.attachAlgorithm(algorithm)
+    backtest.run()
+    return backtest.getBroker().getEquity()
+
+
+results = pd.DataFrame(columns=('buy_function', 'sell_function', 'final_equity'))
+for buy_function in buy_functions.keys():
+    pool = Pool(processes=4)
+    keys = sell_functions.keys()
+    # sell_function_results = Parallel(n_jobs=-1,verbose=11)(delayed(run_algorithm(buy_result_function=buy_functions[buy_function], sell_result_function=sell_functions[i]))(i) for i in keys)
+    sell_function_results = pool.map(lambda x: run_algorithm(buy_result_function=buy_functions[buy_function],
+                                                             sell_result_function=sell_functions[x]), keys)
+    for (i, k) in list(enumerate(keys)):
+        results.loc[len(results)] = [buy_function, k, sell_function_results[i]]
+    print(results)
+# best result: BF1 and SF7
+results.sort(columns='final_equity', inplace=True, ascending=False)
+best_buy_function = results.head(1).buy_function.values[0]
+best_sell_function = results.head(1).sell_function.values[0]
+
+training_buy_window_days = [30, 60, 120, 200, 400, 600]
+forecast_buy_window_days = [5, 10, 20, 40, 80, 150, 200]
+training_sell_window_days = [30, 60, 120, 200, 400, 600]
+forecast_sell_window_days = [5, 10, 20, 40, 80, 150, 200]
+training_days_results = pd.DataFrame(columns=(
+    'training_buy_window_days', 'forecast_buy_window_days', 'training_sell_window_days', 'forecast_sell_window_days',
+    'final_equity'))
+intermediary_results_file = "./intermediary_results.csv"
+for tbwd in training_buy_window_days:
+    for fbwd in forecast_buy_window_days:
+        for tswd in training_sell_window_days:
+            run_alg = partial(run_algorithm, buy_result_function=buy_functions['BF1'],
+                              sell_result_function=sell_functions['SF7'],
+                              fromYear=2014, toYear=2016, training_buy_window_days=tbwd,
+                              forecast_buy_window_days=fbwd, training_sell_window_days=tswd,
+                              intermediary_results_file=intermediary_results_file)
+            pool = Pool(4)
+            days_results = pool.map(run_alg, forecast_sell_window_days)
+
+            if intermediary_results_file is not None and os.path.exists(intermediary_results_file):
+                training_days_results = pd.read_csv(intermediary_results_file, index_col=0)
+            for (i, k) in list(enumerate(forecast_sell_window_days)):
+                training_days_results.loc[len(training_days_results)] = [tbwd, fbwd, tswd, k, days_results[i]]
+
+            print(training_days_results)
+            training_days_results.to_csv(intermediary_results_file)
+
+# fromYear=2014 toYear=2016, training_buy_window_days=30, forecast_buy_window_days=5, training_sell_window_days=30, forecast_sell_window_days=80
+
+#################################################
+codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3",
+         "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3",
+         "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3",
+         "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11",
+         "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('feature_selection2', SelectKBest(mutual_info_classif, k=100)),
+    # ('classifier', DecisionTreeClassifier())
+    # ('classifier', RandomForestClassifier(n_estimators=50, n_jobs=-1))
+    ('classifier', SVC(kernel='rbf', C=1.0, random_state=0))
+])
+backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, fromYear=2014, toYear=2016, debugMode=False,
+                                 csvStorage="./googlefinance")
+algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05,
+                                           models=None, pipeline=pipeline, training_buy_window_days=30,
+                                           forecast_buy_window_days=5, training_sell_window_days=30,
+                                           forecast_sell_window_days=80, buy_result_function=buy_functions['BF1'],
+                                           sell_result_function=sell_functions['SF7'])
+backtest.attachAlgorithm(algorithm)
+backtest.run()
