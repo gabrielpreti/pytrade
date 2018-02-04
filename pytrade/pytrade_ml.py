@@ -9,6 +9,10 @@ from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.feature_selection import SelectKBest
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 
 import multiprocessing
 from pathos.multiprocessing import ProcessingPool as Pool
@@ -230,22 +234,37 @@ for tbwd in training_buy_window_days:
 #################################################
 codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3",
          "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3",
-         "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4", "LREN3",
+         "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KLBN11", "KROT3", "LAME4",
          "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "RUMO3", "SANB11",
          "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
+codes = codes[:20]
 pipeline = Pipeline([
     ('scaler', StandardScaler()),
-    ('feature_selection2', SelectKBest(mutual_info_classif, k=100)),
+    ('feature_selection', SelectKBest(mutual_info_classif, k='all')),
     # ('classifier', DecisionTreeClassifier())
     # ('classifier', RandomForestClassifier(n_estimators=50, n_jobs=-1))
+    # ('classifier', SVC(kernel='linear', C=1.0, random_state=0))
     ('classifier', SVC(kernel='rbf', C=1.0, random_state=0))
+    # ('classifier', MLPClassifier(solver='lbfgs', hidden_layer_sizes=(5, 2)))
 ])
-backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, fromYear=2014, toYear=2016, debugMode=False,
+backtest = GoogleFinanceBacktest(instruments=codes, initialCash=1000000, fromYear=2015, toYear=2016, debugMode=False,
                                  csvStorage="./googlefinance")
 algorithm = MLA.MLAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05,
-                                           models=None, pipeline=pipeline, training_buy_window_days=30,
-                                           forecast_buy_window_days=5, training_sell_window_days=30,
-                                           forecast_sell_window_days=80, buy_result_function=buy_functions['BF1'],
+                                           models=None, pipeline=pipeline, training_buy_window_days=200,
+                                           forecast_buy_window_days=10, training_sell_window_days=30,
+                                           forecast_sell_window_days=5, buy_result_function=buy_functions['BF1'],
                                            sell_result_function=sell_functions['SF7'])
 backtest.attachAlgorithm(algorithm)
 backtest.run()
+plt.interactive(False)
+backtest.generateHtmlReport('/tmp/report.html')
+plt.close('all')
+#1005462.25
+#11 trades: 6 profitable, 5 unprofitable, 0 even
+#$1007915.96
+#9 trades: 4 profitable, 5 unprofitable, 0 even
+
+
+trades = backtest.getTradesAnalyzer()
+
+print("%s trades: %s profitable, %s unprofitable, %s even" %(trades.getCount(), trades.getProfitableCount(), trades.getUnprofitableCount(), trades.getEvenCount()))

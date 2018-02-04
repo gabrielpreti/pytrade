@@ -5,13 +5,17 @@ import talib
 import pandas as pd
 
 
+
 class MLAnalysisTradingAlgorithm(TradingAlgorithm):
     def __init__(self, feed, broker, riskFactor, models, pipeline, training_buy_window_days=60,
                  forecast_buy_window_days=30, training_sell_window_days=60, forecast_sell_window_days=30,
                  buy_result_function=None, sell_result_function=None):
         super(MLAnalysisTradingAlgorithm, self).__init__(feed, broker)
         self.__riskFactor = riskFactor
-        self.__models = models
+        self.__models = models #Esse aqui e para o caso de ja passarmos os modelos prontos para cada stock
+        self.__dynamic_buy_models = {} # Esse aqui e para os modelos gerados dinamicamente: e uma mapa onde a chave e o stock code, e o elemento e uma tupla (modelo, data)
+        self.__dynamic_sell_models = {}  # Esse aqui e para os modelos gerados dinamicamente: e uma mapa onde a chave e o stock code, e o elemento e uma tupla (modelo, data)
+        self.__max_dynamic_model_age = 30
         self.__training_buy_window_days = training_buy_window_days
         self.__forecast_buy_window_days = forecast_buy_window_days
         self.__training_sell_window_days = training_sell_window_days
@@ -20,6 +24,7 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         self.__purchases = {}
         self.__buy_result_function = buy_result_function
         self.__sell_result_function = sell_result_function
+        self.__logger = broker.getLogger()
         broker.getOrderUpdatedEvent().subscribe(self.__onOrderEvent)
 
     def __onOrderEvent(self, broker_, orderEvent):
@@ -44,10 +49,41 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
                 (self.__training_buy_window_days + self.__forecast_buy_window_days),
                 (self.__training_sell_window_days + self.__forecast_sell_window_days))
 
+    def __get_dynamic_model_date_for_instrument(self, model_repository, instrument):
+        return model_repository[instrument][1]
+
+    def __get_dynamic_model_for_instrument(self, model_repository, instrument):
+        return model_repository[instrument][0]
+
+    def __put_dynamic_model_for_instrument(self, model_repository, instrument, model, date):
+        model_repository[instrument] = (model, date)
+
+    def __get_model_age(self, model_repository, instrument, current_date):
+        if instrument not in model_repository.keys():
+            return float('inf')
+
+        model_date = self.__get_dynamic_model_date_for_instrument(model_repository, instrument)
+        delta = current_date - model_date
+        return delta.days
+
+
+
     def shouldBuyStock(self, bar, instrument):
+        if self.getBroker().getShares(instrument) > 0:
+            return False
+
         if self.__models is not None and instrument in self.__models.keys():
             return self.__models[instrument].predict(self.generate_predict_dataset(instrument))[0] == 1
+
+
+        model = None
+        current_date = bar.getDateTime()
+        model_age = self.__get_model_age(self.__dynamic_buy_models, instrument, current_date)
+        if model_age <= self.__max_dynamic_model_age:
+            self.__logger.debug("Current date is %s and buy model age for instrument %s is %s, LESS than %s" % (current_date, instrument, model_age, self.__max_dynamic_model_age))
+            model = self.__get_dynamic_model_for_instrument(self.__dynamic_buy_models, instrument)
         else:
+            self.__logger.debug("Current date is %s and buy model age for instrument %s is %s, MORE than %s" % (current_date, instrument, model_age, self.__max_dynamic_model_age))
             data_set = self.generate_trainingtobuy_dataset(instrument,
                                                            training_window_days=self.__training_buy_window_days,
                                                            forecast_window_days=self.__forecast_buy_window_days)
@@ -57,15 +93,28 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
                 return False
 
             model = self.__pipeline.fit(X, y)
-            return model.predict(self.generate_predict_dataset(instrument))[0] == 1
+            self.__put_dynamic_model_for_instrument(self.__dynamic_buy_models, instrument, model, current_date)
+
+
+        return model.predict(self.generate_predict_dataset(instrument))[0] == 1
 
     def shouldSellStock(self, bar, instrument):
-        if bar.getClose() < self.__purchases[instrument]:
-            return False
+        # if bar.getClose() < self.__purchases[instrument]:
+        #     return False
 
         if self.__models is not None and instrument in self.__models.keys():
             return self.__models[instrument].predict(self.generate_predict_dataset(instrument))[0] == 0
+
+        model = None
+        current_date = bar.getDateTime()
+        model_age = self.__get_model_age(self.__dynamic_sell_models, instrument, current_date)
+        if model_age <= self.__max_dynamic_model_age:
+            self.__logger.debug("Current date is %s and sell model age for instrument %s is %s, LESS than %s" % (
+            current_date, instrument, model_age, self.__max_dynamic_model_age))
+            model = self.__get_dynamic_model_for_instrument(self.__dynamic_sell_models, instrument)
         else:
+            self.__logger.debug("Current date is %s and sell model age for instrument %s is %s, MORE than %s" % (
+            current_date, instrument, model_age, self.__max_dynamic_model_age))
             data_set = self.generate_trainingtosell_dataset(instrument,
                                                             training_window_days=self.__training_sell_window_days,
                                                             forecast_window_days=self.__forecast_sell_window_days)
@@ -78,7 +127,9 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
                 return y[0] == 1
 
             model = self.__pipeline.fit(X, y)
-            return model.predict(self.generate_predict_dataset(instrument))[0] == 1
+            self.__put_dynamic_model_for_instrument(self.__dynamic_sell_models, instrument, model, current_date)
+
+        return model.predict(self.generate_predict_dataset(instrument))[0] == 1
 
     def calculateEntrySize(self, bar, instrument):
 
@@ -111,7 +162,7 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         volume_values = np.array(volume_series) if training_window_days is None else np.array(volume_series)[-(
             training_window_days + forecast_window_days):]
 
-        data_set = self.__generate_features(close_values, high_values, low_values, open_values, volume_values)
+        data_set = self.__generate_features(close_values, high_values, low_values, open_values, volume_values, instrument)
         return data_set.fillna(value=0)
 
     def generate_trainingtobuy_dataset(self, instrument, training_window_days, forecast_window_days):
@@ -139,16 +190,50 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         low_values = np.array(self._feed[instrument].getLowDataSeries())
         volume_values = np.array(self._feed[instrument].getVolumeDataSeries())
 
-        data_set = self.__generate_features(close_values, high_values, low_values, open_values, volume_values)
+        data_set = self.__generate_features(close_values, high_values, low_values, open_values, volume_values, instrument)
         return data_set[-1:].fillna(value=0)
 
-    def __generate_features(self, close_values, high_values, low_values, open_values, volume_values):
+    def __generate_features(self, close_values, high_values, low_values, open_values, volume_values, instrument):
         features = pd.DataFrame()
         features['open_price'] = open_values
         features['close_price'] = close_values
         features['high_price'] = high_values
         features['low_price'] = low_values
         features['volume_price'] = volume_values
+        technical_indicators = self.__generate_technical_indicators(close_values, high_values, low_values, open_values,
+                                             volume_values)
+        for ti in technical_indicators.columns:
+            features[ti] = technical_indicators[ti]
+
+        other_instruments =  list(set(self._feed.getRegisteredInstruments()) - set([instrument]))
+        for instr in other_instruments:
+            open = np.array(self._feed[instr].getOpenDataSeries())
+            high = np.array(self._feed[instr].getHighDataSeries())
+            low = np.array(self._feed[instr].getLowDataSeries())
+            close = np.array(self._feed[instr].getCloseDataSeries())
+            volume = np.array(self._feed[instr].getVolumeDataSeries())
+            max_size = len(open_values)
+
+            features['open_' + instr] = self.__force_size(list(open), max_size)
+            features['open_movement_'+instr] = self.__force_size(list(np.true_divide(np.diff(open), open[:-1])), max_size)
+            features['high_' + instr] = self.__force_size(list(high), max_size)
+            features['high_movement_' + instr] = self.__force_size(list(np.true_divide(np.diff(high), high[:-1])), max_size)
+            features['low_' + instr] = self.__force_size(list(low), max_size)
+            features['low_movement_' + instr] = self.__force_size(list(np.true_divide(np.diff(low), low[:-1])), max_size)
+            features['close_'+instr] = self.__force_size(list(close), max_size)
+            features['close_movement_' + instr] = self.__force_size(list(np.true_divide(np.diff(close), close[:-1])), max_size)
+
+            technical_indicators = self.__generate_technical_indicators(close_values, high_values, low_values,
+                                                                        open_values,
+                                                                        volume_values)
+            for ti in technical_indicators.columns:
+                features["%s_%s" % (ti, instr)] = technical_indicators[ti]
+
+        return features
+
+    def __generate_technical_indicators(self, close_values, high_values, low_values, open_values,
+                                        volume_values):
+        features = pd.DataFrame()
         features['short_sma'] = talib.SMA(close_values, 5)
         features['long_sma'] = talib.SMA(close_values, 20)
         features['sma_diff'] = features.long_sma - features.short_sma
@@ -318,6 +403,17 @@ class MLAnalysisTradingAlgorithm(TradingAlgorithm):
         features['CDLXSIDEGAP3METHODS'] = talib.CDLXSIDEGAP3METHODS(open=open_values, high=high_values, low=low_values,
                                                                     close=close_values)
         return features
+
+    def __force_size(self, list_of_values, size, fill_value=0):
+        if len(list_of_values)>size:
+            return list_of_values[:size]
+
+        if len(list_of_values)<size:
+            while len(list_of_values) < size:
+                list_of_values.insert(0, fill_value)
+            return list_of_values
+
+        return list_of_values
 
 
 class CorrelationAnalysisTradingAlgorithm(TradingAlgorithm):

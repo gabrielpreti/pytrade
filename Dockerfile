@@ -10,7 +10,12 @@ RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
 
 RUN pip install pandas TA-Lib matplotlib texttable  git+https://github.com/gabrielpreti/pyalgotrade.git
 RUN pip install sklearn scipy
+RUN pip install mpld3
+RUN pip install jinja2
+RUN pip install multiprocess pathos
+RUN pip install joblib
 
-COPY . /opt/pytrade/
+
 WORKDIR /opt/pytrade
-ENTRYPOINT ["python"]
+ADD . /opt/pytrade/
+#ENTRYPOINT ["python"]

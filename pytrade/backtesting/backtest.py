@@ -4,6 +4,7 @@ from pyalgotrade.tools import googlefinance
 from pyalgotrade.broker import backtesting
 from pytrade.base import TradingSystem
 from pyalgotrade.stratanalyzer import returns
+from pyalgotrade.stratanalyzer.trades import Trades
 from pytrade.backtesting.analyzer.dalytradingresults import DailyTradingResults
 from pyalgotrade import plotter
 from pyalgotrade.plotter import SecondaryMarker
@@ -35,6 +36,8 @@ class GoogleFinanceBacktest(object):
         self.__strategy.attachAnalyzer(returnsAnalyzer)
         dailyResultsAnalyzer = DailyTradingResults()
         self.__strategy.attachAnalyzer(dailyResultsAnalyzer)
+        self.__tradesAnalyzer = Trades()
+        self.__strategy.attachAnalyzer(self.__tradesAnalyzer)
 
         # Create plotters
         self.__plotters = []
@@ -56,6 +59,9 @@ class GoogleFinanceBacktest(object):
 
     def attachAlgorithm(self, tradingAlgorithm):
         self.__strategy.setAlgorithm(tradingAlgorithm)
+
+    def getTradesAnalyzer(self):
+        return self.__tradesAnalyzer
 
     def run(self):
         self.__strategy.run()

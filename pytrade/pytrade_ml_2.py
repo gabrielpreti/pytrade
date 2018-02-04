@@ -4,7 +4,7 @@ import pandas as pd
 import pytrade.estimator as est
 
 codes = ["ABEV3", "BBAS3", "BBDC3", "BBDC4", "BBSE3", "BRAP4", "BRFS3", "BRKM5", "BRML3", "BVMF3", "CCRO3", "CIEL3", "CMIG4", "CPFE3", "CPLE6", "CSAN3", "CSNA3", "CTIP3", "CYRE3", "ECOR3", "EGIE3", "EMBR3", "ENBR3", "EQTL3", "ESTC3", "FIBR3", "GGBR4", "GOAU4", "HYPE3", "ITSA4", "ITUB4", "JBSS3", "KROT3", "LAME4", "LREN3", "MRFG3", "MRVE3", "MULT3", "NATU3", "PCAR4", "PETR3", "PETR4", "QUAL3", "RADL3", "RENT3", "SANB11", "SBSP3", "SMLE3", "SUZB5", "TIMP3", "UGPA3", "USIM5", "VALE3", "VALE5", "VIVT4", "WEGE3"]
-feed = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015, debugMode=False,
+feed = GoogleFinanceBacktest(instruments=codes, initialCash=10000, fromYear=2015, toYear=2015, debugMode=False,
                                      csvStorage="./googlefinance", filterInvalidRows=False).getFeed()
 feed.loadAll()
 
@@ -49,6 +49,8 @@ backtest = GoogleFinanceBacktest(instruments=codes, initialCash=10000, year=2015
 algorithm = MLA.CorrelationAnalysisTradingAlgorithm(feed=backtest.getFeed(), broker=backtest.getBroker(), riskFactor=0.05, model=estimator)
 backtest.attachAlgorithm(algorithm)
 backtest.run()
+
+
 
 backtest.generateHtmlReport('/tmp/stock_analysis.html')
 plt.close("all")
