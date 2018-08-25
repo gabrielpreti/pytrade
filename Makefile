@@ -22,7 +22,7 @@ speak:
 	echo ${PHRASE}
 
 create-aws-stack:
-	aws cloudformation create-stack --stack-name=${STACK_NAME} --template-body=file://./pytrade-aws.yaml --parameters ParameterKey=MyIp,ParameterValue=${MY_IP} ParameterKey=ProjectName,ParameterValue='Pytrade'
+	aws cloudformation create-stack --stack-name=${STACK_NAME} --template-body=file://./pytrade-aws.yaml --parameters ParameterKey=MyIp,ParameterValue=${MY_IP} ParameterKey=ProjectName,ParameterValue='Pytrade' ParameterKey=NeedsEBSVolume,ParameterValue=false ParameterKey=EC2MarketType,ParameterValue='On-demand'
 
 delete-aws-stack:
 	aws cloudformation delete-stack --stack-name=${STACK_NAME}

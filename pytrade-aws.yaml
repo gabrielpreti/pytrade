@@ -31,6 +31,12 @@ Parameters:
     Type: String
     Default: ami-0a4d90b8df6dcfc35
 
+  Ec2InstanceType:
+    Description: "EC2 instance type"
+    Type: String
+    Default: "t1.micro"
+
+
   NeedsEBSVolume:
     Description: "Does the EC2 instance needs an EBS Volume?"
     Type: String
@@ -42,11 +48,20 @@ Parameters:
     Default: ""
     Type: "String"
 
+  EC2MarketType:
+    Description: "Utilizar spot instances ou on-demand"
+    Type: String
+    AllowedValues: ["Spot", "On-demand"]
+    Default: "Spot"
+
+
 Conditions:
   ShouldUseEBSVolume: !Equals [!Ref NeedsEBSVolume, "true"]
   ShouldCreateNewEBSVolume: !And
     - !Equals [!Ref EBSVolumeId, ""]
     - !Equals [!Ref NeedsEBSVolume, "true"]
+  UseSpotInstance: !Equals [!Ref EC2MarketType, "Spot"]
+  UseOnDemandInstance: !Equals [!Ref EC2MarketType, "On-demand"]
 
 
 Resources:
@@ -195,11 +210,12 @@ Resources:
           ToPort: 22
           CidrIp: !Join ["/", [!Ref MyIp, "32"]]
 
-
-  EC2Instance:
+######EC2 on-demand instance
+  EC2OnDemandInstance:
     Type: AWS::EC2::Instance
+    Condition: UseOnDemandInstance
     Properties:
-      InstanceType: t1.micro
+      InstanceType: !Ref Ec2InstanceType
       SecurityGroupIds:
         - !Ref SshAccessSecurityGroup
       KeyName: !Ref EC2KeyName
@@ -219,6 +235,47 @@ Resources:
             mount /dev/sdh /mnt/ebs_data/
           fi
 
+######EC2 spot instance
+  EC2SpotInstance:
+    Type: AWS::EC2::Instance
+    Condition: UseSpotInstance
+    DependsOn:
+    - EC2LaunchTemplate
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EC2LaunchTemplate
+        Version: 1
+      SecurityGroupIds:
+      - !Ref SshAccessSecurityGroup
+      SubnetId: !Ref Subnet1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "testing cloud init"
+          if [ "${NeedsEBSVolume}" = "true" ];
+          then
+            if [ ! "${EBSVolumeId}" ];
+            then
+              mkfs -t ext4 /dev/sdh
+            fi
+            mkdir /mnt/ebs_data
+            mount /dev/sdh /mnt/ebs_data/
+          fi
+
+  EC2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Condition: UseSpotInstance
+    DependsOn:
+    - Subnet1
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref ImageId
+        InstanceMarketOptions:
+          MarketType: spot
+        InstanceType: !Ref Ec2InstanceType
+        KeyName: !Ref EC2KeyName
+
+
   EBSVolume:
     Type: AWS::EC2::Volume
     Condition: ShouldCreateNewEBSVolume
@@ -231,7 +288,7 @@ Resources:
     Type: AWS::EC2::VolumeAttachment
     Condition: ShouldUseEBSVolume
     Properties:
-      InstanceId: !Ref EC2Instance
+      InstanceId: !If [UseSpotInstance, !Ref EC2SpotInstance, !Ref EC2OnDemandInstance]
       VolumeId:
         !If [ShouldCreateNewEBSVolume, !Ref EBSVolume, !Ref EBSVolumeId]
       Device: "/dev/sdh"
@@ -240,5 +297,5 @@ Outputs:
 
   Ec2InstancePublicIp:
     Description: "Public IP address of the EC2 instance created"
-    Value: !GetAtt EC2Instance.PublicIp
+    Value: !If [UseSpotInstance, !GetAtt EC2SpotInstance.PublicIp, !GetAtt EC2OnDemandInstance.PublicIp]
 
