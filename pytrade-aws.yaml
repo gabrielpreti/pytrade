@@ -29,7 +29,7 @@ Parameters:
   ImageId:
     Description: "Please informe the id to the AMI image to be used by the EC2 instance"
     Type: String
-    Default: ami-cfe4b2b0
+    Default: ami-0a4d90b8df6dcfc35
 
   NeedsEBSVolume:
     Description: "Does the EC2 instance needs an EBS Volume?"
@@ -134,7 +134,7 @@ Resources:
   NaclEphemeralEgressRule:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
-      RuleNumber: 100
+      RuleNumber: 101
       NetworkAclId: !Ref Nacl
       CidrBlock: !Join ["/", [!Ref MyIp, "32"]]
       Egress: true
@@ -143,6 +143,46 @@ Resources:
         To: '65535'
       Protocol: 6
       RuleAction: "allow"
+
+  NaclEphemeralIngressRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      RuleNumber: 102
+      NetworkAclId: !Ref Nacl
+      CidrBlock: "0.0.0.0/0"
+      Egress: false
+      PortRange:
+        From: '1024'
+        To: '65535'
+      Protocol: 6
+      RuleAction: "allow"
+
+  NaclHttpEgressRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      RuleNumber: 103
+      NetworkAclId: !Ref Nacl
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+      PortRange:
+        From: 80
+        To: 80
+      Protocol: 6
+      RuleAction: "allow"
+
+  NaclHttpsEgressRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      RuleNumber: 104
+      NetworkAclId: !Ref Nacl
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+      PortRange:
+        From: 443
+        To: 443
+      Protocol: 6
+      RuleAction: "allow"
+
 
   SshAccessSecurityGroup:
     Type: AWS::EC2::SecurityGroup
