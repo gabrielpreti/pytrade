@@ -29,7 +29,7 @@ Parameters:
   ImageId:
     Description: "Please informe the id to the AMI image to be used by the EC2 instance"
     Type: String
-    Default: ami-0a4d90b8df6dcfc35
+    Default: ami-0ab3c2ffcf795a8a9
 
   Ec2InstanceType:
     Description: "EC2 instance type"
@@ -198,6 +198,19 @@ Resources:
       Protocol: 6
       RuleAction: "allow"
 
+  NaclDockerDaemonEntryRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      RuleNumber: 105
+      NetworkAclId: !Ref Nacl
+      CidrBlock: !Join ["/", [!Ref MyIp, "32"]]
+      Egress: false
+      PortRange:
+        From: '2375'
+        To: '2375'
+      Protocol: 6
+      RuleAction: "allow"
+
 
   SshAccessSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -210,6 +223,17 @@ Resources:
           ToPort: 22
           CidrIp: !Join ["/", [!Ref MyIp, "32"]]
 
+  DockerDaemonAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: "Enable ssh access via port 22"
+      SecurityGroupIngress:
+      - IpProtocol: "tcp"
+        FromPort: 2375
+        ToPort: 2375
+        CidrIp: !Join ["/", [!Ref MyIp, "32"]]
+
 ######EC2 on-demand instance
   EC2OnDemandInstance:
     Type: AWS::EC2::Instance
@@ -218,6 +242,7 @@ Resources:
       InstanceType: !Ref Ec2InstanceType
       SecurityGroupIds:
         - !Ref SshAccessSecurityGroup
+        - !Ref DockerDaemonAccessSecurityGroup
       KeyName: !Ref EC2KeyName
       ImageId: !Ref ImageId
       SubnetId: !Ref Subnet1
@@ -247,6 +272,7 @@ Resources:
         Version: 1
       SecurityGroupIds:
       - !Ref SshAccessSecurityGroup
+      - !Ref DockerDaemonAccessSecurityGroup
       SubnetId: !Ref Subnet1
       UserData:
         Fn::Base64: !Sub |

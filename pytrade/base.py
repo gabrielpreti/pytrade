@@ -85,6 +85,7 @@ class TradingSystem(strategy.BaseStrategy):
 
     def onBars(self, bars):
         assert self.__tradingAlgorithm is not None, "Algorithm not attached."
+        self.info("Processing date %s" % (bars.getDateTime()))
         for instrument in bars.getInstruments():
             self.onBarsImpl(bars, instrument)
 

@@ -31,6 +31,6 @@ get-aws-stack_status:
 	aws cloudformation  describe-stacks --stack-name=${STACK_NAME} --query 'Stacks[0].StackStatus' --output text
 
 ssh-into-instance:
-	set -e ;\
+    set -e ;\
 	INSTANCE_IP=$$(aws cloudformation  describe-stacks --stack-name=${STACK_NAME} --query "Stacks[0].Outputs[?OutputKey=='Ec2InstancePublicIp'].OutputValue" --output text) ;\
 	ssh -i ${SSH_KEY_FILE} ec2-user@$${INSTANCE_IP} ;\
